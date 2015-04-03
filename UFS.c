@@ -254,7 +254,8 @@ static int WriteINodeToDisk(const iNodeEntry *pInInode) {
 
 static int GetFreeRessource(const int TYPE_BITMAP) {
   char dataBlock[BLOCK_SIZE];
-  ReadBlock(TYPE_BITMAP, dataBlock);
+  if (ReadBlock(TYPE_BITMAP, dataBlock) == -1)
+    return -1;
 
   size_t i ;
   for (i = 0; i < BLOCK_SIZE; ++i) {
@@ -285,6 +286,28 @@ static int GetFreeBlock() {
   return GetFreeRessource(FREE_BLOCK_BITMAP);
 }
 
+static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iNodeEntry *pDstInode) {
+
+  if (!(pDstInode->iNodeStat.st_mode & G_IFDIR))
+    return -1;
+
+  char dataBlock[BLOCK_SIZE];
+  if (ReadBlock(pDstInode->Block[0], dataBlock) == -1)
+    return -1;
+
+  DirEntry *pDirEntry = (DirEntry*)dataBlock;
+  if (pDirEntry == NULL)
+    return -1;
+
+  const size_t nDir = NumberofDirEntry(pSrcInode->iNodeStat.st_size);
+  pDirEntry[nDir].iNode = pDstInode->iNodeStat.st_ino;
+  strcpy(pDirEntry[nDir].Filename, filename);
+  if (WriteBlock(pDstInode->Block[0], dataBlock) == -1)
+    return -1;
+  pDstInode->iNodeStat.st_size += sizeof(DirEntry);
+  return WriteINodeToDisk(pDstInode);
+}
+
 int bd_countfreeblocks(void) {
   char dataBlock[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, dataBlock);
@@ -313,7 +336,7 @@ int bd_stat(const char *pFilename, gstat *pStat) {
 }
 
 int bd_create(const char *pFilename) {
-  
+
   return -1;
 }
 
