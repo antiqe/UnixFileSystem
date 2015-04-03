@@ -238,7 +238,7 @@ static int WriteINodeToDisk(const iNodeEntry *pInInode) {
   return 0;
 }
 
-static int ReleaseInodeFromDisk(const int num) {
+static int ReleaseINodeFromDisk(const int num) {
   if (ReleaseRessource(num, FREE_INODE_BITMAP) == -1)
     return -1;
   printf("GLOFS: Relache i-node %d\n", num);
@@ -314,7 +314,7 @@ static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iN
   return WriteINodeToDisk(pDstInode);
 }
 
-static int RemoveINodeFromINode(const iNodeEntry *pSrcInode, iNodeEntry *pDstInode) {
+static int RemoveINodeFromINode(const char* filename, const iNodeEntry *pSrcInode, iNodeEntry *pDstInode) {
   
   if (!(pDstInode->iNodeStat.st_mode & G_IFDIR))
     return -1;
@@ -331,7 +331,8 @@ static int RemoveINodeFromINode(const iNodeEntry *pSrcInode, iNodeEntry *pDstIno
   const size_t nDir = NumberofDirEntry(pDstInode->iNodeStat.st_size);
   size_t i;
   for (i = 0; i < nDir; ++i) {
-    if (pDirEntry[i].iNode == inode)
+    if ((pDirEntry[i].iNode == inode) 
+	&& (strcmp(pDirEntry[i].Filename, filename) == 0))
       break;
   }
   for (; i< nDir; ++i) {
@@ -434,11 +435,11 @@ int bd_mkdir(const char *pDirName) {
   pDirEntry[1].iNode = pDirInode->iNodeStat.st_ino;
   const int idBlocDir = GetFreeBlock();
   if (idBlocDir == -1) {
-    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
+    ReleaseINodeFromDisk(pChildInode->iNodeStat.st_ino);
     return -1;
   }
   if (WriteBlock(idBlocDir, dataBlock) == -1) {
-    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
+    ReleaseINodeFromDisk(pChildInode->iNodeStat.st_ino);
     ReleaseBlockFromDisk(idBlocDir);
     return -1;
   }
@@ -449,14 +450,14 @@ int bd_mkdir(const char *pDirName) {
   pChildInode->iNodeStat.st_blocks = 1;
   pChildInode->Block[0] = idBlocDir;
   if (WriteINodeToDisk(pChildInode) == -1) {
-    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
+    ReleaseINodeFromDisk(pChildInode->iNodeStat.st_ino);
     ReleaseBlockFromDisk(idBlocDir);
     return -1;
   }
 
   pDirInode->iNodeStat.st_nlink++;
   if (AddINodeToINode(dirName, pChildInode, pDirInode) == -1) {
-    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
+    ReleaseINodeFromDisk(pChildInode->iNodeStat.st_ino);
     ReleaseBlockFromDisk(idBlocDir);
     return -1;
   }
@@ -506,6 +507,21 @@ int bd_unlink(const char *pFilename) {
     return -2;
 
   pInode->iNodeStat.st_nlink -= 1;
+
+  if (pInode->iNodeStat.st_nlink == 0)
+    ReleaseINodeFromDisk(pInode->iNodeStat.st_ino);
+  else
+    WriteINodeToDisk(pInode);
+
+  char directory[PATH_SIZE];
+  if (GetDirFromPath(pFilename, directory) == 0)
+    return -1;
+
+  char filename[FILENAME_SIZE];
+  if (GetFilenameFromPath(pFilename, filename) == 0)
+    return -1;
+
+  
   
   return -1;
 }
@@ -526,10 +542,15 @@ int bd_rmdir(const char *pFilename) {
     if (GetINode(pDirEntry[1].iNode, &pInodeParent) == -1)
       return -1;
     pInodeParent->iNodeStat.st_nlink--;
-    if (RemoveINodeFromINode(pInodeDir, pInodeParent) == -1) {
+
+    char filename[FILENAME_SIZE];
+    if (GetFilenameFromPath(pFilename, filename) == 0)
+      return -1;
+
+    if (RemoveINodeFromINode(filename, pInodeDir, pInodeParent) == -1) {
       return -1;
     }
-    ReleaseInodeFromDisk(pInodeDir->iNodeStat.st_ino);
+    ReleaseINodeFromDisk(pInodeDir->iNodeStat.st_ino);
     return 0;
   }
   return -3;
