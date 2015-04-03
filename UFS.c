@@ -383,7 +383,7 @@ int bd_mkdir(const char *pDirName) {
     return -1;
 
   iNodeEntry *pDirInode = alloca(sizeof(*pDirInode));
-  if (GetINodeFromPath(pathOfDir, &pDirInode) == -1 || !(pDirInode->iNodeStat.st_mode & G_IFDIR))
+  if (GetINodeFromPath(pathOfDir, &pDirInode) == -1 || pDirInode->iNodeStat.st_mode & G_IFREG)
     return -1;
   const size_t nDir = NumberofDirEntry(pDirInode->iNodeStat.st_size);
   if (nDir * sizeof(DirEntry) > BLOCK_SIZE)
@@ -416,7 +416,7 @@ int bd_mkdir(const char *pDirName) {
     return -1;
   }
 
-  pChildInode->iNodeStat.st_mode |= G_IRWXU | G_IRWXG;
+  pChildInode->iNodeStat.st_mode |= G_IFDIR | G_IRWXU | G_IRWXG;
   pChildInode->iNodeStat.st_nlink = 1;
   pChildInode->iNodeStat.st_size = 2 * sizeof(DirEntry);
   pChildInode->iNodeStat.st_blocks = 1;
@@ -500,7 +500,28 @@ int bd_unlink(const char *pFilename) {
 }
 
 int bd_rmdir(const char *pFilename) {
-  return -1;
+  iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
+  if (GetINodeFromPath(pFilename, &pInodeDir) == -1)
+    return -1;
+  if (pInodeDir->iNodeStat.st_mode & G_IFREG)
+    return -2;
+  const size_t nDir = NumberofDirEntry(pInodeDir->iNodeStat.st_size);
+  if (nDir == 2) {
+    char dataBlock[BLOCK_SIZE];
+    if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
+      return -1;
+    DirEntry *pDirEntry = (DirEntry*)dataBlock;
+    iNodeEntry *pInodeParent = alloca(sizeof(*pInodeDir));
+    if (GetINode(pDirEntry[1].iNode, &pInodeParent) == -1)
+      return -1;
+    pInodeParent->iNodeStat.st_nlink--;
+    if (WriteINodeToDisk(pInodeParent) == -1) {
+      return -1;
+    }
+    ReleaseInode(pInodeDir->iNodeStat.st_ino);
+    return 0;
+  }
+  return -3;
 }
 
 int bd_rename(const char *pFilename, const char *pDestFilename) {
@@ -510,10 +531,12 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
 
   iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
-  if (GetINodeFromPath(pDirLocation, &pInodeDir) == -1)
+  if (GetINodeFromPath(pDirLocation, &pInodeDir) == -1 || pInodeDir->iNodeStat.st_mode & G_IFREG)
     return -1;
 
-  char *dataBlock = malloc(BLOCK_SIZE);
+  char *dataBlock = NULL;
+  if ((dataBlock = malloc(BLOCK_SIZE)) == NULL)
+    return -1;
   if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
     return -1;
 
