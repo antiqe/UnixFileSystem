@@ -481,8 +481,7 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
 
   if (AddINodeToINode(filename, pInodeEx, pInodeNewDir) == -1)
     return -1;
-
-  return 0;
+  return WriteINodeToDisk(pInodeEx);
 }
 
 int bd_unlink(const char *pFilename) {
