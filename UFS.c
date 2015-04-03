@@ -295,7 +295,6 @@ static int ReleaseBlock(const int num) {
 
 
 static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iNodeEntry *pDstInode) {
-
   if (!(pDstInode->iNodeStat.st_mode & G_IFDIR))
     return -1;
 
@@ -433,7 +432,6 @@ int bd_mkdir(const char *pDirName) {
     ReleaseBlock(idBlocDir);
     return -1;
   }
-
   return 0;
 }
 
@@ -528,6 +526,6 @@ int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
 
   *ppListeFichiers = (DirEntry *)dataBlock;
 
-  return NumberofDirEntry(pInodeDir->iNodeStat.st_size);;
+  return NumberofDirEntry(pInodeDir->iNodeStat.st_size);
 }
 
