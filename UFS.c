@@ -223,7 +223,9 @@ static int WriteINodeToDisk(const iNodeEntry *pInInode) {
   iNodeEntry *pInodeTmp = (iNodeEntry*)(iNodeBlock) + (inode % 8);
   memcpy(pInodeTmp, pInInode, sizeof(*pInodeTmp));
 
-  return WriteBlock(blockOfInode, iNodeBlock);
+  if (WriteBlock(blockOfInode, iNodeBlock) == -1)
+    return -1;
+  return 0;
 }
 
 static int GetFreeRessource(const int TYPE_BITMAP) {
@@ -231,8 +233,8 @@ static int GetFreeRessource(const int TYPE_BITMAP) {
   if (ReadBlock(TYPE_BITMAP, dataBlock) == -1)
     return -1;
 
-  size_t i ;
-  for (i = 0; i < BLOCK_SIZE; ++i) {
+  size_t i = (TYPE_BITMAP == FREE_INODE_BITMAP) ? 1 : 0;
+  for (; i < BLOCK_SIZE; ++i) {
     if (dataBlock[i] != 0) {
       dataBlock[i] = 0;
       if (WriteBlock(TYPE_BITMAP, dataBlock) == -1)
@@ -260,11 +262,10 @@ static int GetFreeINode(iNodeEntry **pOutInode) {
     {
       CleanINode(pOutInode);
       (*pOutInode)->iNodeStat.st_ino = inode;
-      const int inode = WriteINodeToDisk(*pOutInode);
-      if (inode == -1)
+      if (WriteINodeToDisk(*pOutInode) == -1)
         return -1;
       printf("GLOFS: Saisie i-node %d\n", (*pOutInode)->iNodeStat.st_ino);
-      return inode;
+      return (*pOutInode)->iNodeStat.st_ino;
     }
   }
   return -1;
@@ -306,8 +307,8 @@ static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iN
   if (pDirEntry == NULL)
     return -1;
 
-  const size_t nDir = NumberofDirEntry(pSrcInode->iNodeStat.st_size);
-  pDirEntry[nDir].iNode = pDstInode->iNodeStat.st_ino;
+  const size_t nDir = NumberofDirEntry(pDstInode->iNodeStat.st_size);
+  pDirEntry[nDir].iNode = pSrcInode->iNodeStat.st_ino;
   strcpy(pDirEntry[nDir].Filename, filename);
   if (WriteBlock(pDstInode->Block[0], dataBlock) == -1)
     return -1;
@@ -352,17 +353,17 @@ int bd_create(const char *pFilename) {
     return -1;
 
   iNodeEntry *pInodeFile = alloca(sizeof(*pInodeFile));
-  if (GetINodeFromPath(pFilename, &pInodeDir) != -1)
+  if (GetINodeFromPath(pFilename, &pInodeFile) != -1)
     return -2;
- 
+
   if (GetFreeINode(&pInodeFile) != -1) {
     pInodeFile->iNodeStat.st_mode |= G_IRWXU | G_IRWXG | G_IFREG; 
-  
+
     char filename[FILENAME_SIZE];
     if (GetFilenameFromPath(pFilename, filename) == 0)
       return -1;
     if (AddINodeToINode(filename, pInodeFile, pInodeDir) != -1)
-      return 0;
+      return WriteINodeToDisk(pInodeFile);
   }
   return -1;
 }
@@ -472,11 +473,12 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
       ((pInodeEx->iNodeStat.st_mode & G_IFREG) == 0))
     return -3;
 
-  pInodeEx->iNodeStat.st_nlink++;
-  
   char filename[FILENAME_SIZE];
   if (GetFilenameFromPath(pPathNouveauLien, filename) == 0)
     return -1;
+
+  pInodeEx->iNodeStat.st_nlink++;
+
   if (AddINodeToINode(filename, pInodeEx, pInodeNewDir) == -1)
     return -1;
 
