@@ -230,6 +230,61 @@ static int GetINodeFromPath(const char *pFilename, iNodeEntry **pOutInode) {
   return GetINodeFromPathAux(pFilename + 1, ROOT_INODE, pOutInode);
 }
 
+
+static void CleanINode(iNodeEntry **pOutInode) {
+  (*pOutInode)->iNodeStat.st_ino = 0;
+  (*pOutInode)->iNodeStat.st_nlink = 0;
+  (*pOutInode)->iNodeStat.st_size = 0;
+  (*pOutInode)->iNodeStat.st_blocks = 0;
+}
+
+static int WriteINodeToDisk(const iNodeEntry *pInInode) {
+  char iNodeBlock[BLOCK_SIZE];
+
+  const ino inode = pInInode->iNodeStat.st_ino;
+  const size_t blockOfInode = BASE_BLOCK_INODE + (inode / 8);
+  if (ReadBlock(blockOfInode, iNodeBlock) == -1)
+    return -1;
+
+  iNodeEntry *pInodeTmp = (iNodeEntry*)(iNodeBlock) + (inode % 8);
+  memcpy(pInodeTmp, pInInode, sizeof(*pInodeTmp));
+
+  return WriteBlock(blockOfInode, iNodeBlock);
+}
+
+static int GetFreeRessource(const int TYPE_BITMAP) {
+  char dataBlock[BLOCK_SIZE];
+  ReadBlock(TYPE_BITMAP, dataBlock);
+
+  size_t i ;
+  for (i = 0; i < BLOCK_SIZE; ++i) {
+    if (dataBlock[i] != 0) {
+      dataBlock[i] = 0;
+      if (WriteBlock(TYPE_BITMAP, dataBlock) == -1)
+	return -1;
+      return i;
+    }
+  }
+  return -1;
+}
+
+static int GetFreeINode(iNodeEntry **pOutInode) {
+  const int inode = GetFreeRessource(FREE_INODE_BITMAP);
+  if (inode != -1) {
+    if (GetINode(inode, pOutInode) != -1)
+      {
+	CleanINode(pOutInode);
+	(*pOutInode)->iNodeStat.st_ino = inode;
+	return WriteINodeToDisk(*pOutInode);
+      }
+  }
+  return -1;
+}
+
+static int GetFreeBlock() {
+  return GetFreeRessource(FREE_BLOCK_BITMAP);
+}
+
 int bd_countfreeblocks(void) {
   char dataBlock[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, dataBlock);
@@ -258,6 +313,7 @@ int bd_stat(const char *pFilename, gstat *pStat) {
 }
 
 int bd_create(const char *pFilename) {
+  
   return -1;
 }
 
