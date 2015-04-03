@@ -316,6 +316,35 @@ static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iN
   return WriteINodeToDisk(pDstInode);
 }
 
+static int RemoveINodeFromINode(const iNodeEntry *pSrcInode, iNodeEntry *pDstInode) {
+  
+  if (!(pDstInode->iNodeStat.st_mode & G_IFDIR))
+    return -1;
+
+  char dataBlock[BLOCK_SIZE];
+  if (ReadBlock(pDstInode->Block[0], dataBlock) == -1)
+    return -1;
+
+  DirEntry *pDirEntry = (DirEntry*)dataBlock;
+  if (pDirEntry == NULL)
+    return -1;
+  
+  const ino inode = pSrcInode->iNodeStat.st_ino;
+  const size_t nDir = NumberofDirEntry(pDstInode->iNodeStat.st_size);
+  size_t i;
+  for (i = 0; i < nDir; ++i) {
+    if (pDirEntry[i].iNode == inode)
+      break;
+  }
+  for (; i< nDir; ++i) {
+    pDirEntry[i] = pDirEntry[i + 1];
+  }
+  pDstInode->iNodeStat.st_size -= sizeof(DirEntry);
+  if (WriteBlock(pDstInode->Block[0], dataBlock) == -1)
+    return -1;
+  return WriteINodeToDisk(pDstInode);
+}
+
 int bd_countfreeblocks(void) {
   char dataBlock[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, dataBlock);
@@ -494,7 +523,7 @@ int bd_unlink(const char *pFilename) {
     return -2;
 
   pInode->iNodeStat.st_nlink -= 1;
-
+  
   return -1;
 }
 
