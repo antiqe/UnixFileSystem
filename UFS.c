@@ -406,11 +406,12 @@ int bd_mkdir(const char *pDirName) {
   pDirEntry[1].iNode = pDirInode->iNodeStat.st_ino;
   const int idBlocDir = GetFreeBlock();
   if (idBlocDir == -1) {
-    // Release Inode
+    ReleaseInode(pChildInode->iNodeStat.st_ino);
     return -1;
   }
   if (WriteBlock(idBlocDir, dataBlock) == -1) {
-    // Release Block
+    ReleaseInode(pChildInode->iNodeStat.st_ino);
+    ReleaseBlock(idBlocDir);
     return -1;
   }
 
@@ -420,25 +421,29 @@ int bd_mkdir(const char *pDirName) {
   pChildInode->iNodeStat.st_blocks = 1;
   pChildInode->Block[0] = idBlocDir;
   if (WriteINodeToDisk(pChildInode) == -1) {
-    // Release Block et Inode;
+    ReleaseInode(pChildInode->iNodeStat.st_ino);
+    ReleaseBlock(idBlocDir);
     return -1;
   }
 
   if (ReadBlock(pDirInode->Block[0], dataBlock) == -1) {
-    // Release Block et Inode
+    ReleaseInode(pChildInode->iNodeStat.st_ino);
+    ReleaseBlock(idBlocDir);
     return -1;
   }
   pDirEntry = (DirEntry*)dataBlock;
   strcpy(pDirEntry[nDir].Filename, dirName);
   pDirEntry[nDir].iNode = pChildInode->iNodeStat.st_ino;
   if (WriteBlock(pDirInode->Block[0], dataBlock) == -1) {
-    // realse Block et Inode
+    ReleaseInode(pChildInode->iNodeStat.st_ino);
+    ReleaseBlock(idBlocDir);
   }
 
   pDirInode->iNodeStat.st_nlink++;
   pDirInode->iNodeStat.st_size += sizeof(DirEntry);
   if (WriteINodeToDisk(pDirInode) == -1) {
-    // Release Block et Inode;
+    ReleaseInode(pChildInode->iNodeStat.st_ino);
+    ReleaseBlock(idBlocDir);
     return -1;
   }
 
@@ -501,6 +506,17 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 }
 
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
-  return -1;
+
+  iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
+  if (GetINodeFromPath(pDirLocation, &pInodeDir) == -1)
+    return -1;
+
+  char *dataBlock = malloc(BLOCK_SIZE);
+  if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
+    return -1;
+
+  *ppListeFichiers = (DirEntry *)dataBlock;
+
+  return NumberofDirEntry(pInodeDir->iNodeStat.st_size);;
 }
 
