@@ -496,7 +496,17 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 }
 
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
-  if ()
-  return -1;
+
+  iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
+  if (GetINodeFromPath(pDirLocation, &pInodeDir) == -1)
+    return -1;
+
+  char *dataBlock = malloc(BLOCK_SIZE);
+  if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
+    return -1;
+
+  *ppListeFichiers = (DirEntry *)dataBlock;
+
+  return NumberofDirEntry(pInodeDir->iNodeStat.st_size);;
 }
 
