@@ -415,7 +415,7 @@ int bd_mkdir(const char *pDirName) {
     return -1;
   }
 
-  pChildInode->iNodeStat.st_mode |= G_IRWXU | G_IRWXG;
+  pChildInode->iNodeStat.st_mode |= G_IFDIR | G_IRWXU | G_IRWXG;
   pChildInode->iNodeStat.st_nlink = 1;
   pChildInode->iNodeStat.st_size = 2 * sizeof(DirEntry);
   pChildInode->iNodeStat.st_blocks = 1;
