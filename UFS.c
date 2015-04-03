@@ -456,22 +456,8 @@ int bd_mkdir(const char *pDirName) {
     return -1;
   }
 
-  if (ReadBlock(pDirInode->Block[0], dataBlock) == -1) {
-    ReleaseInode(pChildInode->iNodeStat.st_ino);
-    ReleaseBlock(idBlocDir);
-    return -1;
-  }
-  pDirEntry = (DirEntry*)dataBlock;
-  strcpy(pDirEntry[nDir].Filename, dirName);
-  pDirEntry[nDir].iNode = pChildInode->iNodeStat.st_ino;
-  if (WriteBlock(pDirInode->Block[0], dataBlock) == -1) {
-    ReleaseInode(pChildInode->iNodeStat.st_ino);
-    ReleaseBlock(idBlocDir);
-  }
-
   pDirInode->iNodeStat.st_nlink++;
-  pDirInode->iNodeStat.st_size += sizeof(DirEntry);
-  if (WriteINodeToDisk(pDirInode) == -1) {
+  if (AddINodeToINode(dirName, pChildInode, pDirInode) == -1) {
     ReleaseInode(pChildInode->iNodeStat.st_ino);
     ReleaseBlock(idBlocDir);
     return -1;
