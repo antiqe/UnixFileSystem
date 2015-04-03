@@ -4,6 +4,8 @@
 #include <string.h>
 #include "disque.h"
 
+#define PATH_SIZE 4096
+
 // Quelques fonctions qui pourraient vous être utiles
 int NumberofDirEntry(int Size) {
   return Size/sizeof(DirEntry);
@@ -329,7 +331,7 @@ int bd_stat(const char *pFilename, gstat *pStat) {
 
   iNodeEntry *pInode = alloca(sizeof(*pInode));
   const int inode = GetINodeFromPath(pFilename, &pInode);
-  if (inode != 1) {
+  if (inode != -1) {
     pStat->st_ino = pInode->iNodeStat.st_ino;
     pStat->st_mode = pInode->iNodeStat.st_mode;
     pStat->st_nlink = pInode->iNodeStat.st_nlink;
@@ -341,7 +343,27 @@ int bd_stat(const char *pFilename, gstat *pStat) {
 }
 
 int bd_create(const char *pFilename) {
+  char directory[PATH_SIZE];
+  if (GetDirFromPath(pFilename, directory) == 0)
+    return -1;
 
+  iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
+  if (GetINodeFromPath(directory, &pInodeDir) == -1)
+    return -1;
+
+  iNodeEntry *pInodeFile = alloca(sizeof(*pInodeFile));
+  if (GetINodeFromPath(pFilename, &pInodeDir) != -1)
+    return -2;
+ 
+  if (GetFreeINode(&pInodeFile) != -1) {
+    pInodeFile->iNodeStat.st_mode |= G_IRWXU | G_IRWXG | G_IFREG; 
+  
+    char filename[FILENAME_SIZE];
+    if (GetFilenameFromPath(pFilename, filename) == 0)
+      return -1;
+    if (AddINodeToINode(filename, pInodeFile, pInodeDir) != -1)
+      return 0;
+  }
   return -1;
 }
 
@@ -424,7 +446,36 @@ int bd_mkdir(const char *pDirName) {
 }
 
 int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
-  return -1;
+  
+  iNodeEntry *pInodeEx = alloca(sizeof(*pInodeEx));
+  if (GetINodeFromPath(pPathExistant, &pInodeEx) == -1)
+    return -1;
+
+  char directory[PATH_SIZE];
+  if (GetDirFromPath(pPathNouveauLien, directory) == 0)
+    return -1;
+
+  iNodeEntry *pInodeNewDir = alloca(sizeof(*pInodeNewDir));
+  if (GetINodeFromPath(directory, &pInodeNewDir) == -1)
+    return -1;
+
+  iNodeEntry *pInodeNewFile = alloca(sizeof(*pInodeNewFile));
+  if (GetINodeFromPath(pPathNouveauLien, &pInodeNewFile) != -1)
+    return -2;
+
+  if (((pInodeEx->iNodeStat.st_mode & G_IFDIR) != 0) &&
+      ((pInodeEx->iNodeStat.st_mode & G_IFREG) != 1))
+    return -3;
+
+  pInodeEx->iNodeStat.st_nlink++;
+  
+  char filename[FILENAME_SIZE];
+  if (GetFilenameFromPath(pPathNouveauLien, filename) == 0)
+    return -1;
+  if (AddINodeToINode(filename, pInodeEx, pInodeNewDir) == -1)
+    return -1;
+
+  return 0;
 }
 
 int bd_unlink(const char *pFilename) {
