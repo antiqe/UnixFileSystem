@@ -174,7 +174,6 @@ static int PathToINode(const char *pFilename, const ino inode) {
     return -1;
 
   const size_t offset = (inode % 8) * (BLOCK_SIZE / 8);
-
   iNodeEntry *pInode = (iNodeEntry*)(iNodeBlock + offset);
   if (pInode == NULL)
     return -1;
@@ -189,17 +188,17 @@ static int PathToINode(const char *pFilename, const ino inode) {
 
   char *pos = strchr(pFilename, '/');
   char path[FILENAME_SIZE];
+  path[0] = 0;
   if (pos != NULL) {
     strncpy(path, pFilename, (pos - pFilename) + 1);
-    path[(pos - pFilename) + 1] = 0;
+    path[(pos - pFilename)] = 0;
   }
-
 
   const size_t nDir = NumberofDirEntry(pInode->iNodeStat.st_size);
   size_t i = 0;
-
   for (; i < nDir; ++i) {
     printf("Path = %s\n", pDirEntry[i].Filename);
+    printf("%s\n",  path);
     if (strcmp(pDirEntry[i].Filename, path) == 0) {
       if (pos != NULL) {
         PathToINode(pos + 1, pDirEntry[i].iNode);

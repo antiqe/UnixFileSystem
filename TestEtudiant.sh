@@ -144,7 +144,7 @@ echo -e "\nDoit afficher $N_FREEBLOCK blocs de libre, car l'inode est toujours d
 ./ufs blockfree
 ./ufs unlink /hlnb.txt
 ./ufs ls /
-let "N_FREEBLOCK=$N_FREEBLOCK+1"
+let "N_FREEBLOCK=$N_FREEBLOCK+3"
 echo -e "\nDoit afficher $N_FREEBLOCK blocs de libre, car l'inode a été libéré:"
 ./ufs blockfree
 echo -e "\nDoit échouer avec -1, car /b.txt n'existe plus:"
