@@ -377,7 +377,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 
 int bd_mkdir(const char *pDirName) {
 
-  char pathOfDir[256];
+  char pathOfDir[PATH_SIZE];
   if (GetDirFromPath(pDirName, pathOfDir) == 0)
     return -1;
 
@@ -391,7 +391,7 @@ int bd_mkdir(const char *pDirName) {
   if (GetINodeFromPath(pDirName, &pChildInode) != -1)
     return -2;
 
-  char dirName[256];
+  char dirName[PATH_SIZE];
   if (GetFilenameFromPath(pDirName, dirName) == 0)
     return -1;
 
@@ -463,8 +463,8 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
   if (GetINodeFromPath(pPathNouveauLien, &pInodeNewFile) != -1)
     return -2;
 
-  if (((pInodeEx->iNodeStat.st_mode & G_IFDIR) != 0) &&
-      ((pInodeEx->iNodeStat.st_mode & G_IFREG) != 1))
+  if (((pInodeEx->iNodeStat.st_mode & G_IFDIR) == 1) &&
+      ((pInodeEx->iNodeStat.st_mode & G_IFREG) == 0))
     return -3;
 
   pInodeEx->iNodeStat.st_nlink++;
@@ -479,6 +479,16 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
 }
 
 int bd_unlink(const char *pFilename) {
+
+  iNodeEntry *pInode = alloca(sizeof(*pInode));
+  if (GetINodeFromPath(pFilename, &pInode) == -1)
+    return -1;
+
+  if ((pInode->iNodeStat.st_mode & G_IFREG) == 0)
+    return -2;
+
+  pInode->iNodeStat.st_nlink -= 1;
+
   return -1;
 }
 
