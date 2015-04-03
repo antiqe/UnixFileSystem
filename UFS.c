@@ -527,7 +527,7 @@ int bd_rmdir(const char *pFilename) {
     if (GetINode(pDirEntry[1].iNode, &pInodeParent) == -1)
       return -1;
     pInodeParent->iNodeStat.st_nlink--;
-    if (WriteINodeToDisk(pInodeParent) == -1) {
+    if (RemoveINodeFromINode(pInodeDir, pInodeParent) == -1) {
       return -1;
     }
     ReleaseInode(pInodeDir->iNodeStat.st_ino);
