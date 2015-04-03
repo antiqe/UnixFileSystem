@@ -212,6 +212,16 @@ static void CleanINode(iNodeEntry **pOutInode) {
   (*pOutInode)->iNodeStat.st_blocks = 0;
 }
 
+static  int ReleaseRessource(const int num, const int TYPE_BITMAP) {
+  char dataBlock[BLOCK_SIZE];
+  if ((ReadBlock(TYPE_BITMAP, dataBlock) == -1) || num > BLOCK_SIZE)
+    return -1;
+  dataBlock[num] = 1;
+  if (WriteBlock(TYPE_BITMAP, dataBlock) == -1)
+    return -1;
+  return 0;
+}
+
 static int WriteINodeToDisk(const iNodeEntry *pInInode) {
   char iNodeBlock[BLOCK_SIZE];
 
@@ -225,6 +235,20 @@ static int WriteINodeToDisk(const iNodeEntry *pInInode) {
 
   if (WriteBlock(blockOfInode, iNodeBlock) == -1)
     return -1;
+  return 0;
+}
+
+static int ReleaseInodeFromDisk(const int num) {
+  if (ReleaseRessource(num, FREE_INODE_BITMAP) == -1)
+    return -1;
+  printf("GLOFS: Relache i-node %d\n", num);
+  return 0;
+}
+
+static int ReleaseBlockFromDisk(const int num) {
+  if (ReleaseRessource(num, FREE_BLOCK_BITMAP) == -1)
+    return -1;
+  printf("GLOFS: Relache bloc %d\n", num);
   return 0;
 }
 
@@ -243,16 +267,6 @@ static int GetFreeRessource(const int TYPE_BITMAP) {
     }
   }
   return -1;
-}
-
-static  int ReleaseRessource(const int num, const int TYPE_BITMAP) {
-  char dataBlock[BLOCK_SIZE];
-  if ((ReadBlock(TYPE_BITMAP, dataBlock) == -1) || num > BLOCK_SIZE)
-    return -1;
-  dataBlock[num] = 1;
-  if (WriteBlock(TYPE_BITMAP, dataBlock) == -1)
-    return -1;
-  return 0;
 }
 
 static int GetFreeINode(iNodeEntry **pOutInode) {
@@ -278,21 +292,6 @@ static int GetFreeBlock() {
   printf("GLOFS: Saisie bloc %d\n", block);
   return block;
 }
-
-static int ReleaseInode(const int num) {
-  if (ReleaseRessource(num, FREE_INODE_BITMAP) == -1)
-    return -1;
-  printf("GLOFS: Relache i-node %d\n", num);
-  return 0;
-}
-
-static int ReleaseBlock(const int num) {
-  if (ReleaseRessource(num, FREE_BLOCK_BITMAP) == -1)
-    return -1;
-  printf("GLOFS: Relache bloc %d\n", num);
-  return 0;
-}
-
 
 static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iNodeEntry *pDstInode) {
   if (!(pDstInode->iNodeStat.st_mode & G_IFDIR))
@@ -435,12 +434,12 @@ int bd_mkdir(const char *pDirName) {
   pDirEntry[1].iNode = pDirInode->iNodeStat.st_ino;
   const int idBlocDir = GetFreeBlock();
   if (idBlocDir == -1) {
-    ReleaseInode(pChildInode->iNodeStat.st_ino);
+    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
     return -1;
   }
   if (WriteBlock(idBlocDir, dataBlock) == -1) {
-    ReleaseInode(pChildInode->iNodeStat.st_ino);
-    ReleaseBlock(idBlocDir);
+    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
+    ReleaseBlockFromDisk(idBlocDir);
     return -1;
   }
 
@@ -450,15 +449,15 @@ int bd_mkdir(const char *pDirName) {
   pChildInode->iNodeStat.st_blocks = 1;
   pChildInode->Block[0] = idBlocDir;
   if (WriteINodeToDisk(pChildInode) == -1) {
-    ReleaseInode(pChildInode->iNodeStat.st_ino);
-    ReleaseBlock(idBlocDir);
+    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
+    ReleaseBlockFromDisk(idBlocDir);
     return -1;
   }
 
   pDirInode->iNodeStat.st_nlink++;
   if (AddINodeToINode(dirName, pChildInode, pDirInode) == -1) {
-    ReleaseInode(pChildInode->iNodeStat.st_ino);
-    ReleaseBlock(idBlocDir);
+    ReleaseInodeFromDisk(pChildInode->iNodeStat.st_ino);
+    ReleaseBlockFromDisk(idBlocDir);
     return -1;
   }
   return 0;
@@ -530,7 +529,7 @@ int bd_rmdir(const char *pFilename) {
     if (RemoveINodeFromINode(pInodeDir, pInodeParent) == -1) {
       return -1;
     }
-    ReleaseInode(pInodeDir->iNodeStat.st_ino);
+    ReleaseInodeFromDisk(pInodeDir->iNodeStat.st_ino);
     return 0;
   }
   return -3;
