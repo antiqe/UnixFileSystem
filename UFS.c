@@ -241,7 +241,7 @@ int bd_countfreeblocks(void) {
 
 int bd_stat(const char *pFilename, gstat *pStat) {
 
-  const int inode = GetPathFromINode(pFilename + 1, ROOT_INODE);
+  const int inode = GetPathFromINode(pFilename, ROOT_INODE);
   printf("Inode = %d\n", inode);
   return -1;
 }
