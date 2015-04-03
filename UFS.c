@@ -506,37 +506,45 @@ int bd_unlink(const char *pFilename) {
   if ((pInode->iNodeStat.st_mode & G_IFREG) == 0)
     return -2;
 
-  pInode->iNodeStat.st_nlink -= 1;
+  char directory[PATH_SIZE];
+  if (GetDirFromPath(pFilename, directory) == 0)
+    return -1;
 
+  iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
+  if (GetINodeFromPath(directory, &pInodeDir) == -1)
+    return -1;
+
+  pInode->iNodeStat.st_nlink -= 1;
   if (pInode->iNodeStat.st_nlink == 0)
     ReleaseINodeFromDisk(pInode->iNodeStat.st_ino);
   else
     WriteINodeToDisk(pInode);
 
-  char directory[PATH_SIZE];
-  if (GetDirFromPath(pFilename, directory) == 0)
-    return -1;
-
   char filename[FILENAME_SIZE];
   if (GetFilenameFromPath(pFilename, filename) == 0)
     return -1;
 
-  
-  
-  return -1;
+  if (RemoveINodeFromINode(filename, pInode, pInodeDir) == -1)
+    return -1;
+  return 0;
 }
 
 int bd_rmdir(const char *pFilename) {
+
   iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
   if (GetINodeFromPath(pFilename, &pInodeDir) == -1)
     return -1;
+
   if (pInodeDir->iNodeStat.st_mode & G_IFREG)
     return -2;
+
   const size_t nDir = NumberofDirEntry(pInodeDir->iNodeStat.st_size);
   if (nDir == 2) {
+
     char dataBlock[BLOCK_SIZE];
     if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
       return -1;
+
     DirEntry *pDirEntry = (DirEntry*)dataBlock;
     iNodeEntry *pInodeParent = alloca(sizeof(*pInodeDir));
     if (GetINode(pDirEntry[1].iNode, &pInodeParent) == -1)
@@ -547,9 +555,9 @@ int bd_rmdir(const char *pFilename) {
     if (GetFilenameFromPath(pFilename, filename) == 0)
       return -1;
 
-    if (RemoveINodeFromINode(filename, pInodeDir, pInodeParent) == -1) {
+    if (RemoveINodeFromINode(filename, pInodeDir, pInodeParent) == -1)
       return -1;
-    }
+
     ReleaseINodeFromDisk(pInodeDir->iNodeStat.st_ino);
     return 0;
   }
