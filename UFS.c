@@ -164,19 +164,34 @@ int getInode(const int num, iNodeEntry **iNode)
   return 1;
 }
 
-
-static int PathToINode(const char *pFilename, const ino inode) {
-
+static int GetINode(const ino inode, iNodeEntry **pInode) {
+  
   char iNodeBlock[BLOCK_SIZE];
 
   const size_t blockOfInode = BASE_BLOCK_INODE + (inode / 8);
   if (ReadBlock(blockOfInode, iNodeBlock) == -1)
     return -1;
 
-  const size_t offset = (inode % 8) * (BLOCK_SIZE / 8);
-  iNodeEntry *pInode = (iNodeEntry*)(iNodeBlock + offset);
-  if (pInode == NULL)
+  const iNodeEntry *pInodeTmp = (iNodeEntry*)(iNodeBlock) + (inode % 8);
+
+  printf("pInode.Block[0] %d\n", pInodeTmp->Block[0]);
+
+  (*pInode)->iNodeStat = pInodeTmp->iNodeStat;
+  size_t i = 0;
+  for (i = 0; i < N_BLOCK_PER_INODE; ++i) {
+    (*pInode)->Block[i] = pInodeTmp->Block[i];
+  }
+
+  return *pInode == NULL;
+}
+
+static int GetPathFromINode(const char *pFilename, const ino inode) {
+
+  iNodeEntry *pInode = alloca(sizeof(*pInode));
+  if (GetINode(inode, &pInode) != 0)
     return -1;
+
+  printf("pInode.Block[0] %d\n", pInode->Block[0]);
 
   char dirEntryBlock[BLOCK_SIZE];
   if (ReadBlock(pInode->Block[0], dirEntryBlock) == -1)
@@ -188,29 +203,28 @@ static int PathToINode(const char *pFilename, const ino inode) {
 
   char *pos = strchr(pFilename, '/');
   char path[FILENAME_SIZE];
-  path[0] = 0;
   if (pos != NULL) {
-    strncpy(path, pFilename, (pos - pFilename) + 1);
+    strncpy(path, pFilename, (pos - pFilename));
     path[(pos - pFilename)] = 0;
+  } else {
+    strcpy(path, pFilename);
   }
 
   const size_t nDir = NumberofDirEntry(pInode->iNodeStat.st_size);
   size_t i = 0;
   for (; i < nDir; ++i) {
-    printf("Path = %s\n", pDirEntry[i].Filename);
-    printf("%s\n",  path);
+    printf("Path = %s == %s %s\n", pDirEntry[i].Filename, path, pos);
     if (strcmp(pDirEntry[i].Filename, path) == 0) {
-      if (pos != NULL) {
-        PathToINode(pos + 1, pDirEntry[i].iNode);
+      iNodeEntry *pInode = alloca(sizeof(*pInode));
+      if (GetINode(pDirEntry[i].iNode, &pInode) != 0)
+	return -1;
+      if (pos != NULL && strcmp(pos, "/") && (pInode->iNodeStat.st_mode & G_IFDIR)) {
+        return GetPathFromINode(pos + 1, pDirEntry[i].iNode);
       }
-      else {
-        return pDirEntry[i].iNode + BASE_BLOCK_INODE;
-      }
-      break;
+      return pDirEntry[i].iNode + BASE_BLOCK_INODE;
     }
   }
-
-  return 0;
+  return -1;
 }
 
 int bd_countfreeblocks(void) {
@@ -227,7 +241,7 @@ int bd_countfreeblocks(void) {
 
 int bd_stat(const char *pFilename, gstat *pStat) {
 
-  const int inode = PathToINode(pFilename + 1, ROOT_INODE);
+  const int inode = GetPathFromINode(pFilename + 1, ROOT_INODE);
   printf("Inode = %d\n", inode);
   return -1;
 }
