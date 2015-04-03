@@ -174,8 +174,6 @@ static int GetINode(const ino inode, iNodeEntry **pInode) {
 
   const iNodeEntry *pInodeTmp = (iNodeEntry*)(iNodeBlock) + (inode % 8);
 
-  printf("pInode.Block[0] %d\n", pInodeTmp->Block[0]);
-
   (*pInode)->iNodeStat = pInodeTmp->iNodeStat;
   size_t i = 0;
   for (i = 0; i < N_BLOCK_PER_INODE; ++i) {
@@ -185,13 +183,11 @@ static int GetINode(const ino inode, iNodeEntry **pInode) {
   return *pInode == NULL;
 }
 
-static int GetPathFromINode(const char *pFilename, const ino inode) {
+static int GetINodeFromPathAux(const char *pFilename, const ino inode, iNodeEntry **pOutInode) {
 
   iNodeEntry *pInode = alloca(sizeof(*pInode));
   if (GetINode(inode, &pInode) != 0)
     return -1;
-
-  printf("pInode.Block[0] %d\n", pInode->Block[0]);
 
   char dirEntryBlock[BLOCK_SIZE];
   if (ReadBlock(pInode->Block[0], dirEntryBlock) == -1)
@@ -213,18 +209,25 @@ static int GetPathFromINode(const char *pFilename, const ino inode) {
   const size_t nDir = NumberofDirEntry(pInode->iNodeStat.st_size);
   size_t i = 0;
   for (; i < nDir; ++i) {
-    printf("Path = %s == %s %s\n", pDirEntry[i].Filename, path, pos);
     if (strcmp(pDirEntry[i].Filename, path) == 0) {
-      iNodeEntry *pInode = alloca(sizeof(*pInode));
-      if (GetINode(pDirEntry[i].iNode, &pInode) != 0)
+      if (GetINode(pDirEntry[i].iNode, pOutInode) != 0)
 	return -1;
-      if (pos != NULL && strcmp(pos, "/") && (pInode->iNodeStat.st_mode & G_IFDIR)) {
-        return GetPathFromINode(pos + 1, pDirEntry[i].iNode);
+      if (pos != NULL && strcmp(pos, "/") && ((*pOutInode)->iNodeStat.st_mode & G_IFDIR)) {
+        return GetINodeFromPathAux(pos + 1, pDirEntry[i].iNode, pOutInode);
       }
-      return pDirEntry[i].iNode + BASE_BLOCK_INODE;
+      return pDirEntry[i].iNode;
     }
   }
   return -1;
+}
+
+static int GetINodeFromPath(const char *pFilename, iNodeEntry **pOutInode) {
+  if (strcmp(pFilename, "/") == 0) {
+    if (GetINode(ROOT_INODE, pOutInode) != 0)
+      return -1;
+    return ROOT_INODE;
+  }
+  return GetINodeFromPathAux(pFilename + 1, ROOT_INODE, pOutInode);
 }
 
 int bd_countfreeblocks(void) {
@@ -241,8 +244,16 @@ int bd_countfreeblocks(void) {
 
 int bd_stat(const char *pFilename, gstat *pStat) {
 
-  const int inode = GetPathFromINode(pFilename, ROOT_INODE);
-  printf("Inode = %d\n", inode);
+  iNodeEntry *pInode = alloca(sizeof(*pInode));
+  const int inode = GetINodeFromPath(pFilename, &pInode);
+  if (inode != 1) {
+    pStat->st_ino = pInode->iNodeStat.st_ino;
+    pStat->st_mode = pInode->iNodeStat.st_mode;
+    pStat->st_nlink = pInode->iNodeStat.st_nlink;
+    pStat->st_size = pInode->iNodeStat.st_size;
+    pStat->st_blocks = pInode->iNodeStat.st_blocks;
+    return 0;
+  }
   return -1;
 }
 
