@@ -511,7 +511,9 @@ int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
   if (GetINodeFromPath(pDirLocation, &pInodeDir) == -1 || pInodeDir->iNodeStat.st_mode & G_IFREG)
     return -1;
 
-  char *dataBlock = malloc(BLOCK_SIZE);
+  char *dataBlock = NULL;
+  if ((dataBlock = malloc(BLOCK_SIZE)) == NULL)
+    return -1;
   if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
     return -1;
 
