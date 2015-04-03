@@ -488,7 +488,6 @@ int bd_unlink(const char *pFilename) {
 }
 
 int bd_rmdir(const char *pFilename) {
-
   iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
   if (GetINodeFromPath(pFilename, &pInodeDir) == -1)
     return -1;
@@ -496,7 +495,19 @@ int bd_rmdir(const char *pFilename) {
     return -2;
   const size_t nDir = NumberofDirEntry(pInodeDir->iNodeStat.st_size);
   if (nDir == 2) {
-
+    char dataBlock[BLOCK_SIZE];
+    if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
+      return -1;
+    DirEntry *pDirEntry = (DirEntry*)dataBlock;
+    iNodeEntry *pInodeParent = alloca(sizeof(*pInodeDir));
+    if (GetINode(pDirEntry[1].iNode, &pInodeParent) == -1)
+      return -1;
+    pInodeParent->iNodeStat.st_nlink--;
+    if (WriteINodeToDisk(pInodeParent) == -1) {
+      return -1;
+    }
+    ReleaseInode(pInodeDir->iNodeStat.st_ino);
+    return 0;
   }
   return -3;
 }
