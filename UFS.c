@@ -268,6 +268,7 @@ static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iN
   strcpy(pDirEntry[nDir].Filename, filename);
   if (WriteBlock(pDstInode->Block[0], dataBlock) == -1)
     return -1;
+  pDstInode->iNodeStat.st_nlink++;
   pDstInode->iNodeStat.st_size += sizeof(DirEntry);
   return WriteINodeToDisk(pDstInode);
 }
@@ -348,6 +349,7 @@ int bd_create(const char *pFilename) {
 
   if (GetFreeINode(&pInodeFile) != -1) {
     pInodeFile->iNodeStat.st_mode |= G_IRWXU | G_IRWXG | G_IFREG; 
+    pInodeFile->iNodeStat.st_nlink = 1;
 
     if (AddINodeToINode(filename, pInodeFile, pInodeDir) != -1)
       return WriteINodeToDisk(pInodeFile);
@@ -524,7 +526,6 @@ int bd_mkdir(const char *pDirName) {
     return -1;
   }
 
-  pDirInode->iNodeStat.st_nlink++;
   if (AddINodeToINode(dirName, pChildInode, pDirInode) == -1) {
     ReleaseINodeFromDisk(pChildInode->iNodeStat.st_ino);
     ReleaseBlockFromDisk(idBlocDir);
