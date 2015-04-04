@@ -515,8 +515,12 @@ int bd_unlink(const char *pFilename) {
     return -1;
 
   pInode->iNodeStat.st_nlink -= 1;
-  if (pInode->iNodeStat.st_nlink == 0)
+  if (pInode->iNodeStat.st_nlink == 0) {
+    size_t i;
+    for (i = 0; i < pInode->iNodeStat.st_blocks; ++i)
+        ReleaseBlockFromDisk(pInode->Block[i]);
     ReleaseINodeFromDisk(pInode->iNodeStat.st_ino);
+  }
   else
     WriteINodeToDisk(pInode);
 
@@ -555,6 +559,7 @@ int bd_rmdir(const char *pFilename) {
     if (RemoveINodeFromINode(filename, pInodeDir, pInodeParent) == -1)
       return -1;
 
+    ReleaseBlockFromDisk(pInodeDir->Block[0]);
     ReleaseINodeFromDisk(pInodeDir->iNodeStat.st_ino);
     return 0;
   }
@@ -562,7 +567,49 @@ int bd_rmdir(const char *pFilename) {
 }
 
 int bd_rename(const char *pFilename, const char *pDestFilename) {
-  return -1;
+  if (strcmp(pFilename, pDestFilename) == 0)
+    return 0;
+
+  char filenameSrc[FILENAME_SIZE];
+  if (GetFilenameFromPath(pFilename, filenameSrc) == 0)
+    return -1;
+  char directorySrc[PATH_SIZE];
+  if (GetDirFromPath(pFilename, directorySrc) == 0)
+    return -1;
+  iNodeEntry *pInodeParentSrc = alloca(sizeof(*pInodeParentSrc));
+  if (GetINodeFromPath(directorySrc, &pInodeParentSrc) == -1)
+    return -1;
+  iNodeEntry *pInodeSrc = alloca(sizeof(*pInodeSrc));
+  if (GetINodeFromPath(pFilename, &pInodeSrc) == -1)
+    return -1;
+  char filenameDest[FILENAME_SIZE];
+  if (GetFilenameFromPath(pDestFilename, filenameDest) == 0)
+    return -1;
+  char directoryDest[PATH_SIZE];
+  if (GetDirFromPath(pDestFilename, directoryDest) == 0)
+    return -1;
+  iNodeEntry *pInodeParentDest = alloca(sizeof(*pInodeParentDest));
+  if (GetINodeFromPath(directoryDest, &pInodeParentDest) == -1)
+    return -1;
+
+  if (pInodeSrc->iNodeStat.st_mode & G_IFDIR) {
+    pInodeParentSrc->iNodeStat.st_nlink--;
+    pInodeParentDest->iNodeStat.st_nlink++;
+    char dataBlock[BLOCK_SIZE];
+    if (ReadBlock(pInodeSrc->Block[0], dataBlock) == -1)
+      return -1;
+    DirEntry *pDirEntry = (DirEntry*)dataBlock;
+    pDirEntry[1].iNode = pInodeParentDest->iNodeStat.st_ino;
+    if (WriteBlock(pInodeSrc->Block[0], dataBlock) == -1)
+      return -1;
+  }
+
+  if (RemoveINodeFromINode(filenameSrc, pInodeSrc, pInodeParentSrc) == -1)
+    return -1;
+  if (AddINodeToINode(filenameDest, pInodeSrc, pInodeParentDest) == -1)
+    return  -1;
+
+  return 0;
 }
 
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
