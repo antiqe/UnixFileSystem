@@ -580,14 +580,11 @@ int bd_rmdir(const char *pFilename) {
 
   const size_t nDir = NumberofDirEntry(pInodeDir->iNodeStat.st_size);
   if (nDir == 2) {
-
-    char dataBlock[BLOCK_SIZE];
-    if (ReadBlock(pInodeDir->Block[0], dataBlock) == -1)
+    iNodeEntry *pInodeParent = alloca(sizeof(*pInodeParent));
+    char directory[PATH_SIZE];
+    if (GetDirFromPath(pFilename, directory) == 0)
       return -1;
-
-    DirEntry *pDirEntry = (DirEntry*)dataBlock;
-    iNodeEntry *pInodeParent = alloca(sizeof(*pInodeDir));
-    if (GetINode(pDirEntry[1].iNode, &pInodeParent) == -1)
+    if (GetINodeFromPath(directory, &pInodeParent) == -1)
       return -1;
     pInodeParent->iNodeStat.st_nlink--;
 
