@@ -376,6 +376,10 @@ int bd_create(const char *pFilename) {
   if (GetDirFromPath(pFilename, directory) == 0)
     return -1;
 
+  char filename[PATH_SIZE];
+  if (GetFilenameFromPath(pFilename, filename) == 0 || strlen(filename) > FILENAME_SIZE)
+    return -1;
+
   iNodeEntry *pInodeDir = alloca(sizeof(*pInodeDir));
   if (GetINodeFromPath(directory, &pInodeDir) == -1)
     return -1;
@@ -387,9 +391,6 @@ int bd_create(const char *pFilename) {
   if (GetFreeINode(&pInodeFile) != -1) {
     pInodeFile->iNodeStat.st_mode |= G_IRWXU | G_IRWXG | G_IFREG; 
 
-    char filename[FILENAME_SIZE];
-    if (GetFilenameFromPath(pFilename, filename) == 0)
-      return -1;
     if (AddINodeToINode(filename, pInodeFile, pInodeDir) != -1)
       return WriteINodeToDisk(pInodeFile);
   }
@@ -450,19 +451,19 @@ int bd_mkdir(const char *pDirName) {
   if (GetDirFromPath(pDirName, pathOfDir) == 0)
     return -1;
 
+  char dirName[PATH_SIZE];
+  if (GetFilenameFromPath(pDirName, dirName) == 0 || strlen(dirName) > FILENAME_SIZE)
+    return -1;
+  
   iNodeEntry *pDirInode = alloca(sizeof(*pDirInode));
   if (GetINodeFromPath(pathOfDir, &pDirInode) == -1 || pDirInode->iNodeStat.st_mode & G_IFREG)
     return -1;
   const size_t nDir = NumberofDirEntry(pDirInode->iNodeStat.st_size);
-  if (nDir * sizeof(DirEntry) > BLOCK_SIZE)
+  if (((nDir + 1) * sizeof(DirEntry)) > BLOCK_SIZE)
     return -1;
   iNodeEntry *pChildInode = alloca(sizeof(*pChildInode));
   if (GetINodeFromPath(pDirName, &pChildInode) != -1)
     return -2;
-
-  char dirName[PATH_SIZE];
-  if (GetFilenameFromPath(pDirName, dirName) == 0)
-    return -1;
 
   if (GetFreeINode(&pChildInode) == -1)
     return -1;
@@ -646,6 +647,10 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 
   if (RemoveINodeFromINode(filenameSrc, pInodeSrc, pInodeParentSrc) == -1)
     return -1;
+
+  if (strcmp(directorySrc, directoryDest) == 0)
+    pInodeParentDest = pInodeParentSrc;
+
   if (AddINodeToINode(filenameDest, pInodeSrc, pInodeParentDest) == -1)
     return  -1;
 
