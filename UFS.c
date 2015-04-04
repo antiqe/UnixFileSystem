@@ -432,34 +432,39 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   const size_t offsetFirstBlock = offset % BLOCK_SIZE;
   const size_t bytesWriten = min(numbytes, maxFileSize - offset);
   const size_t lastBlock = (bytesWriten + offset) / BLOCK_SIZE;
+  const size_t offsetLastBlock = (bytesWriten + offset) % BLOCK_SIZE;
   
-  size_t i, readOffset = 0;
+  size_t i, readOffset, writeOffset = 0;
   for (i = firstBlock; i <= lastBlock; ++i) {
 
-    size_t lengthToWrite = 0, writeOffset = 0;
-    char *dataBlock = alloca(BLOCK_SIZE);
-    int block = pInode->Block[i];
-
-    if ((pInode->iNodeStat.st_size % BLOCK_SIZE) && (i == firstBlock)) {
-      if (ReadBlock(block, dataBlock) == -1)
-	return -1;
-
-      lengthToWrite = (bytesWriten + offsetFirstBlock > BLOCK_SIZE) ? BLOCK_SIZE - offsetFirstBlock : bytesWriten;
-      writeOffset = offsetFirstBlock;
-    } else {
+    if (i >= pInode->iNodeStat.st_blocks) {
+      int block = 0;
       if ((block = GetFreeBlock()) == -1)
-	return -1;
-
+        return -1;
+      pInode->Block[i] = block;
       pInode->iNodeStat.st_blocks++;
-      lengthToWrite = (i == lastBlock) ? (bytesWriten - readOffset) : BLOCK_SIZE;
-      writeOffset = 0;
     }
 
-    memcpy(&dataBlock[writeOffset], &buffer[readOffset], lengthToWrite);
-    if (WriteBlock(block, dataBlock) == -1)
+    char *dataBlock = alloca(BLOCK_SIZE);
+    if (ReadBlock(pInode->Block[i], dataBlock) == -1)
       return -1;
 
-    readOffset += lengthToWrite;
+    size_t length = BLOCK_SIZE;
+    writeOffset = 0;
+    if (i == firstBlock) {
+      writeOffset = offsetFirstBlock;
+      length = min(BLOCK_SIZE - offsetFirstBlock, bytesWriten);
+    }
+    else if (i == lastBlock) {
+      length = offsetLastBlock;
+    }
+
+    memcpy(&dataBlock[writeOffset], &buffer[readOffset], length);
+
+    if (WriteBlock(pInode->Block[i], dataBlock) == -1)
+      return -1;
+
+    readOffset += length;
   }
 
   pInode->iNodeStat.st_size = max(pInode->iNodeStat.st_size, offset + bytesWriten);
