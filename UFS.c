@@ -374,7 +374,6 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   }
 
   const size_t firstBlock = offset / BLOCK_SIZE;
-  const size_t offsetFirstBlock = offset % BLOCK_SIZE;
   const size_t bytesRead = min(pInode->iNodeStat.st_size - offset, numbytes);
   const size_t lastBlock = (bytesRead + offset) / BLOCK_SIZE;
 
@@ -387,8 +386,8 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
 
     size_t length = BLOCK_SIZE;
     if (i == firstBlock) {
-      dataBlock += offsetFirstBlock;
-      length = BLOCK_SIZE - offsetFirstBlock;
+      dataBlock += (offset % BLOCK_SIZE);
+      length = BLOCK_SIZE - (offset % BLOCK_SIZE);
     }
     else if (i == lastBlock) {
       length = bytesRead - writeOffset;
