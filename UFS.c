@@ -96,48 +96,6 @@ void printiNode(iNodeEntry iNode) {
 					            à vous de jouer, maintenant!
    ---------------------------------------------------------------------------------------- */
 
-int getInode(const int num, iNodeEntry **iNode)
-{
-
-  if(num < 0 || num > 32){
-    return 0;
-  }
-
-  // get the block where the inode lies
-  int numBlockOfInode = BASE_BLOCK_INODE + (num/8);
-  int nOffset = num%8;
-  int offset = nOffset * (BLOCK_SIZE/8);
-
-  char Data[BLOCK_SIZE];
-
-  // load the block into memory
-  ReadBlock(numBlockOfInode, Data);
-
-  // move the pointer to the desired offset for the inode
-  char *Dataoffset;
-  Dataoffset = Data + offset;
-
-  // cast the datablock into an inode
-  iNodeEntry *pInodeTemp;
-  pInodeTemp = (iNodeEntry*)Dataoffset;
-
-  // creat an empty inode on the heap
-  iNodeEntry *pInode;
-  pInode = malloc(sizeof(iNodeEntry));
-
-  // deep copy of the temp inode
-  pInode->iNodeStat = pInodeTemp->iNodeStat;
-  int index = 0;
-  for (index = 0; index < N_BLOCK_PER_INODE; index++) {
-    pInode->Block[index] = pInodeTemp->Block[index];
-  }
-
-  // assign the inode to the param
-  *iNode = pInode;
-
-  return 1;
-}
-
 static int GetINode(const ino inode, iNodeEntry **pInode) {
 
   char iNodeBlock[BLOCK_SIZE];
@@ -454,7 +412,7 @@ int bd_mkdir(const char *pDirName) {
   char dirName[PATH_SIZE];
   if (GetFilenameFromPath(pDirName, dirName) == 0 || strlen(dirName) > FILENAME_SIZE)
     return -1;
-  
+
   iNodeEntry *pDirInode = alloca(sizeof(*pDirInode));
   if (GetINodeFromPath(pathOfDir, &pDirInode) == -1 || pDirInode->iNodeStat.st_mode & G_IFREG)
     return -1;
