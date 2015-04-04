@@ -347,11 +347,11 @@ static int RemoveINodeFromINode(const char* filename, const iNodeEntry *pSrcInod
 int bd_countfreeblocks(void) {
   char dataBlock[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, dataBlock);
-  size_t i = 0;
-  size_t count = 0;
-  while (i < BLOCK_SIZE) {
-    if (dataBlock[i] != 0) count++;
-    ++i;
+
+  size_t i, count = 0;
+  for (i = 0; i < BLOCK_SIZE; ++i) {
+    if (dataBlock[i] != 0)
+      count++;
   }
   return count;
 }
@@ -397,7 +397,47 @@ int bd_create(const char *pFilename) {
 }
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
-  return -1;
+
+  iNodeEntry *pInode = alloca(sizeof(*pInode));
+  const int inode = GetINodeFromPath(pFilename, &pInode);
+  if (inode == -1) {
+    printf("Le fichier %s est inexistant! ", pFilename);
+    return -1;
+  }
+ 
+  if (pInode->iNodeStat.st_mode & G_IFDIR == 0) {
+    printf("Le fichier %s est un répertoir! ", pFilename);
+    return -2;
+  }
+
+  if (pInode->iNodeStat.st_size < offset) {
+    return 0;
+  }
+
+  const size_t firstBlock = offset / BLOCK_SIZE;
+  const size_t offsetFirstBlock = offset % BLOCK_SIZE;
+
+  const size_t bytesRead = min(pInode->iNodeStat.st_size - offset, numbytes);
+
+  const size_t lastBlock = bytesRead / BLOCK_SIZE;
+  const size_t offsetLastBlock = bytesRead % BLOCK_SIZE;
+
+  size_t i;
+  for (i = firstBlock; i <= lastBlock; ++i) {
+    
+    char *dataBlock = alloca(BLOCK_SIZE);
+    if (ReadBlock(pInode->Block[i], dataBlock) == -1)
+      return -1;
+
+    if (i == firstBlock) {
+      dataBlock += offsetFirstBlock;
+    }
+
+    const size_t length = (i == lastBlock) ? offsetLastBlock : BLOCK_SIZE;
+    strncpy(&buffer[i * length], dataBlock, length);
+
+  }
+  return bytesRead;
 }
 
 int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes) {
