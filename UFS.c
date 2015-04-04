@@ -360,12 +360,12 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   iNodeEntry *pInode = alloca(sizeof(*pInode));
   const int inode = GetINodeFromPath(pFilename, &pInode);
   if (inode == -1) {
-    printf("Le fichier %s est inexistant! ", pFilename);
+    printf("Le fichier %s est inexistant!\n", pFilename);
     return -1;
   }
  
   if (pInode->iNodeStat.st_mode & G_IFDIR == 0) {
-    printf("Le fichier %s est un répertoir! ", pFilename);
+    printf("Le fichier %s est un répertoire!\n", pFilename);
     return -2;
   }
 
@@ -393,14 +393,86 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
     }
 
     const size_t length = (i == lastBlock) ? offsetLastBlock : BLOCK_SIZE;
-    strncpy(&buffer[i * length], dataBlock, length);
+    memcpy(&buffer[i * length], dataBlock, length);
 
   }
   return bytesRead;
 }
 
 int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes) {
-  return -1;
+
+  iNodeEntry *pInode = alloca(sizeof(*pInode));
+  const int inode = GetINodeFromPath(pFilename, &pInode);
+  if (inode == -1) {
+    printf("Le fichier %s est inexistant!\n", pFilename);
+    return -1;
+  }
+ 
+  if (pInode->iNodeStat.st_mode & G_IFDIR == 0) {
+    printf("Le fichier %s est un répertoire!\n", pFilename);
+    return -2;
+  }
+
+  if (offset > pInode->iNodeStat.st_size) {
+    printf("L'offset demande est trop grand!\n");
+    return -3;
+  }
+
+  const size_t maxFileSize = N_BLOCK_PER_INODE * BLOCK_SIZE;
+  if (offset > maxFileSize) {
+    return -4;
+  }
+
+  if ((numbytes + offset) > maxFileSize) {
+    printf("Le fichier %s deviendra trop gros!\n", pFilename);
+  }
+
+  const size_t firstBlock = offset / BLOCK_SIZE;
+  const size_t offsetFirstBlock = offset % BLOCK_SIZE;
+
+  const size_t bytesWriten = min(numbytes, maxFileSize - offset);
+  
+  const size_t lastBlock = bytesWriten / BLOCK_SIZE;
+  const size_t offsetLastBlock = bytesWriten % BLOCK_SIZE;
+  
+  size_t i, readOffset = 0;
+  for (i = firstBlock; i <= lastBlock; ++i) {
+
+    size_t lengthToWrite = 0, writeOffset = 0;
+    char *dataBlock = alloca(BLOCK_SIZE);
+    int block = pInode->Block[i];
+
+    const size_t memSize = pInode->iNodeStat.st_blocks * BLOCK_SIZE;
+    const size_t fileSize = pInode->iNodeStat.st_size;
+    if (memSize > fileSize) {
+      if (ReadBlock(block, dataBlock) == -1)
+	return -1;
+
+      const size_t memFree = memSize - fileSize;
+      lengthToWrite = (memFree - bytesWriten) < 0 ? memFree : bytesWriten;      
+      writeOffset = (i == 0) ? offset : fileSize;
+
+    } else {
+      if ((block = GetFreeBlock()) == -1)
+	return -1;
+
+      pInode->iNodeStat.st_blocks++;
+      lengthToWrite = (BLOCK_SIZE - bytesWriten) < 0 ? BLOCK_SIZE : (BLOCK_SIZE - bytesWriten);
+      writeOffset = 0;
+    }
+
+    memcpy(&dataBlock[writeOffset], &buffer[readOffset], lengthToWrite);
+    if (WriteBlock(block, dataBlock) == -1)
+      return -1;
+
+    readOffset += lengthToWrite;
+    pInode->iNodeStat.st_size += lengthToWrite;
+  }
+
+  if (WriteINodeToDisk(pInode) == -1)
+    return -1;
+
+  return bytesWriten;
 }
 
 int bd_mkdir(const char *pDirName) {

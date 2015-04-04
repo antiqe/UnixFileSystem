@@ -184,7 +184,7 @@ static int glofs_rmdir(const char* path) {
 }
 
 static int glofs_read(const char *pFilename, char *buffer, size_t numbytes, off_t offset, struct fuse_file_info *fo) {
-	printf("read(%s,%d,%jd) appelé.\n",pFilename,numbytes, offset);
+	printf("read(%s,%ld,%jd) appelé.\n",pFilename,numbytes, offset);
 	int RetCode = bd_read(pFilename, buffer, offset, numbytes);
 	if (RetCode<0) {
 		if (RetCode == -1) return -ENOENT; // "from" does not exist, or "to" directory does not exist.
@@ -209,7 +209,7 @@ static int glofs_truncate(const char *pFilename, off_t offset) {
 
 
 static int glofs_write(const char *pFilename, const char *buffer, size_t numbytes, off_t offset, struct fuse_file_info *fo) {
-	printf("write(%s,%d,%jd) appelé.\n",pFilename,numbytes, offset);
+	printf("write(%s,%ld,%jd) appelé.\n",pFilename,numbytes, offset);
 	int RetCode = bd_write(pFilename, buffer, offset, numbytes);
 	if (RetCode<0) {
 		if (RetCode == -1) return -ENOENT; // "from" does not exist, or "to" directory does not exist.
