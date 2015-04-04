@@ -364,7 +364,7 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
     return -1;
   }
  
-  if (pInode->iNodeStat.st_mode & G_IFDIR == 0) {
+  if (pInode->iNodeStat.st_mode & G_IFDIR) {
     printf("Le fichier %s est un répertoire!\n", pFilename);
     return -2;
   }
@@ -408,7 +408,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
     return -1;
   }
  
-  if (pInode->iNodeStat.st_mode & G_IFDIR == 0) {
+  if (pInode->iNodeStat.st_mode & G_IFDIR) {
     printf("Le fichier %s est un répertoire!\n", pFilename);
     return -2;
   }
@@ -433,7 +433,6 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   const size_t bytesWriten = min(numbytes, maxFileSize - offset);
   
   const size_t lastBlock = bytesWriten / BLOCK_SIZE;
-  const size_t offsetLastBlock = bytesWriten % BLOCK_SIZE;
   
   size_t i, readOffset = 0;
   for (i = firstBlock; i <= lastBlock; ++i) {
@@ -444,20 +443,20 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 
     const size_t memSize = pInode->iNodeStat.st_blocks * BLOCK_SIZE;
     const size_t fileSize = pInode->iNodeStat.st_size;
-    if (memSize > fileSize) {
+    if (memSize > fileSize && i == 0) {
       if (ReadBlock(block, dataBlock) == -1)
 	return -1;
 
-      const size_t memFree = memSize - fileSize;
-      lengthToWrite = (memFree - bytesWriten) < 0 ? memFree : bytesWriten;      
-      writeOffset = (i == 0) ? offset : fileSize;
+      lengthToWrite = (bytesWriten + offsetFirstBlock > BLOCK_SIZE) ? BLOCK_SIZE - offsetFirstBlock : bytesWriten;
+      writeOffset = offsetFirstBlock;
+      pInode->iNodeStat.st_size = offsetFirstBlock;
 
     } else {
       if ((block = GetFreeBlock()) == -1)
 	return -1;
 
       pInode->iNodeStat.st_blocks++;
-      lengthToWrite = (BLOCK_SIZE - bytesWriten) < 0 ? BLOCK_SIZE : (BLOCK_SIZE - bytesWriten);
+      lengthToWrite = (i == lastBlock) ? (bytesWriten - readOffset) : BLOCK_SIZE;
       writeOffset = 0;
     }
 
@@ -553,8 +552,8 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
   if (GetINodeFromPath(pPathNouveauLien, &pInodeNewFile) != -1)
     return -2;
 
-  if (((pInodeEx->iNodeStat.st_mode & G_IFDIR) == 1) &&
-      ((pInodeEx->iNodeStat.st_mode & G_IFREG) == 0))
+  if ((pInodeEx->iNodeStat.st_mode & G_IFDIR) &&
+      !(pInodeEx->iNodeStat.st_mode & G_IFREG))
     return -3;
 
   char filename[FILENAME_SIZE];
@@ -574,7 +573,7 @@ int bd_unlink(const char *pFilename) {
   if (GetINodeFromPath(pFilename, &pInode) == -1)
     return -1;
 
-  if ((pInode->iNodeStat.st_mode & G_IFREG) == 0)
+  if (!(pInode->iNodeStat.st_mode & G_IFREG))
     return -2;
 
   char directory[PATH_SIZE];
