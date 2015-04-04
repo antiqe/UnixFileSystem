@@ -375,26 +375,27 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
 
   const size_t firstBlock = offset / BLOCK_SIZE;
   const size_t offsetFirstBlock = offset % BLOCK_SIZE;
-
   const size_t bytesRead = min(pInode->iNodeStat.st_size - offset, numbytes);
+  const size_t lastBlock = (bytesRead + offset) / BLOCK_SIZE;
 
-  const size_t lastBlock = bytesRead / BLOCK_SIZE;
-  const size_t offsetLastBlock = bytesRead % BLOCK_SIZE;
-
-  size_t i;
+  size_t i, writeOffset = 0;
   for (i = firstBlock; i <= lastBlock; ++i) {
     
     char *dataBlock = alloca(BLOCK_SIZE);
     if (ReadBlock(pInode->Block[i], dataBlock) == -1)
       return -1;
 
+    size_t length = BLOCK_SIZE;
     if (i == firstBlock) {
       dataBlock += offsetFirstBlock;
+      length = BLOCK_SIZE - offsetFirstBlock;
+    }
+    else if (i == lastBlock) {
+      length = bytesRead - writeOffset;
     }
 
-    const size_t length = (i == lastBlock) ? offsetLastBlock : BLOCK_SIZE;
-    memcpy(&buffer[i * length], dataBlock, length);
-
+    memcpy(&buffer[writeOffset], dataBlock, length);
+    writeOffset += length;
   }
   return bytesRead;
 }
@@ -429,10 +430,8 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 
   const size_t firstBlock = offset / BLOCK_SIZE;
   const size_t offsetFirstBlock = offset % BLOCK_SIZE;
-
   const size_t bytesWriten = min(numbytes, maxFileSize - offset);
-  
-  const size_t lastBlock = bytesWriten / BLOCK_SIZE;
+  const size_t lastBlock = (bytesWriten + offset) / BLOCK_SIZE;
   
   size_t i, readOffset = 0;
   for (i = firstBlock; i <= lastBlock; ++i) {
@@ -441,16 +440,12 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
     char *dataBlock = alloca(BLOCK_SIZE);
     int block = pInode->Block[i];
 
-    const size_t memSize = pInode->iNodeStat.st_blocks * BLOCK_SIZE;
-    const size_t fileSize = pInode->iNodeStat.st_size;
-    if (memSize > fileSize && i == 0) {
+    if ((pInode->iNodeStat.st_size % BLOCK_SIZE) && (i == firstBlock)) {
       if (ReadBlock(block, dataBlock) == -1)
 	return -1;
 
       lengthToWrite = (bytesWriten + offsetFirstBlock > BLOCK_SIZE) ? BLOCK_SIZE - offsetFirstBlock : bytesWriten;
       writeOffset = offsetFirstBlock;
-      pInode->iNodeStat.st_size = offsetFirstBlock;
-
     } else {
       if ((block = GetFreeBlock()) == -1)
 	return -1;
@@ -465,9 +460,9 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
       return -1;
 
     readOffset += lengthToWrite;
-    pInode->iNodeStat.st_size += lengthToWrite;
   }
 
+  pInode->iNodeStat.st_size = max(pInode->iNodeStat.st_size, offset + bytesWriten);
   if (WriteINodeToDisk(pInode) == -1)
     return -1;
 
