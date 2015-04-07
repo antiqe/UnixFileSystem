@@ -165,6 +165,7 @@ static int GetINodeFromPath(const char *pFilename, iNodeEntry **pOutInode) {
 
 static void CleanINode(iNodeEntry **pOutInode) {
   (*pOutInode)->iNodeStat.st_ino = 0;
+  (*pOutInode)->iNodeStat.st_mode = 0;
   (*pOutInode)->iNodeStat.st_nlink = 0;
   (*pOutInode)->iNodeStat.st_size = 0;
   (*pOutInode)->iNodeStat.st_blocks = 0;
@@ -367,7 +368,7 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   }
  
   if (pInode->iNodeStat.st_mode & G_IFDIR) {
-    printf("Le fichier %s est un répertoire!\n", pFilename);
+    printf("Le fichier %s est un repertoire!\n", pFilename);
     return -2;
   }
 
@@ -413,7 +414,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   }
  
   if (pInode->iNodeStat.st_mode & G_IFDIR) {
-    printf("Le fichier %s est un répertoire!\n", pFilename);
+    printf("Le fichier %s est un repertoire!\n", pFilename);
     return -2;
   }
 
@@ -461,7 +462,9 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
     char *dataBlock = alloca(BLOCK_SIZE);
     if (ReadBlock(pInode->Block[i], dataBlock) == -1)
       return -1;
+
     memcpy(&dataBlock[writeOffset[i]], &buffer[readOffset], length[i]);
+
     if (WriteBlock(pInode->Block[i], dataBlock) == -1)
       return -1;
     readOffset += length[i];
