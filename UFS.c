@@ -381,15 +381,11 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   const size_t lastBlock = (sizeToRead + offset) / BLOCK_SIZE;
   const size_t offsetLastBlock = (sizeToRead + offset) % BLOCK_SIZE;  
 
-  size_t length[N_BLOCK_PER_INODE] = { 
-    BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 
-    BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 
-    BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE };
-
+  size_t length[N_BLOCK_PER_INODE] = {[0 ... N_BLOCK_PER_INODE - 1] = BLOCK_SIZE};
   length[lastBlock] = offsetLastBlock;
   length[firstBlock] = min(BLOCK_SIZE - offsetFirstBlock, sizeToRead);
 
-  size_t readOffset[N_BLOCK_PER_INODE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  size_t readOffset[N_BLOCK_PER_INODE] = {[0 ... N_BLOCK_PER_INODE - 1] = 0};
   readOffset[firstBlock] = offsetFirstBlock;
 
   size_t i, writeOffset = 0;
@@ -438,15 +434,11 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   const size_t lastBlock = (sizeToWrite + offset) / BLOCK_SIZE;
   const size_t offsetLastBlock = (sizeToWrite + offset) % BLOCK_SIZE;  
   
-  size_t length[N_BLOCK_PER_INODE] = { 
-    BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 
-    BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 
-    BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE };
-
+  size_t length[N_BLOCK_PER_INODE] = {[0 ... N_BLOCK_PER_INODE - 1] = BLOCK_SIZE};
   length[lastBlock] = offsetLastBlock;
   length[firstBlock] = min(BLOCK_SIZE - offsetFirstBlock, sizeToWrite);
 
-  size_t writeOffset[N_BLOCK_PER_INODE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  size_t writeOffset[N_BLOCK_PER_INODE] = {[0 ... N_BLOCK_PER_INODE - 1] = 0};
   writeOffset[firstBlock] = offsetFirstBlock;
 
   size_t i, readOffset = 0;
