@@ -304,6 +304,7 @@ static int RemoveINodeFromINode(const char* filename, const iNodeEntry *pSrcInod
 }
 
 int bd_countfreeblocks(void) {
+
   char dataBlock[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, dataBlock);
 
@@ -331,6 +332,7 @@ int bd_stat(const char *pFilename, gstat *pStat) {
 }
 
 int bd_create(const char *pFilename) {
+
   char directory[PATH_SIZE];
   if (GetDirFromPath(pFilename, directory) == 0)
     return -1;
@@ -389,7 +391,7 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   readOffset[firstBlock] = offsetFirstBlock;
 
   size_t i, writeOffset = 0;
-  for (i = firstBlock; i <= lastBlock; ++i) {
+  for (i = firstBlock; i < lastBlock; ++i) {
     char *dataBlock = alloca(BLOCK_SIZE);
     if (ReadBlock(pInode->Block[i], dataBlock) == -1)
       return -1;
@@ -442,7 +444,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   writeOffset[firstBlock] = offsetFirstBlock;
 
   size_t i, readOffset = 0;
-  for (i = firstBlock; i <= lastBlock; ++i) {
+  for (i = firstBlock; i < lastBlock; ++i) {
     if (i >= pInode->iNodeStat.st_blocks) {
       int block = 0;
       if ((block = GetFreeBlock()) == -1)
@@ -531,7 +533,7 @@ int bd_mkdir(const char *pDirName) {
 }
 
 int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
-  
+
   iNodeEntry *pInodeEx = alloca(sizeof(*pInodeEx));
   if (GetINodeFromPath(pPathExistant, &pInodeEx) == -1)
     return -1;
@@ -633,6 +635,7 @@ int bd_rmdir(const char *pFilename) {
 }
 
 int bd_rename(const char *pFilename, const char *pDestFilename) {
+
   if (strcmp(pFilename, pDestFilename) == 0)
     return 0;
 
