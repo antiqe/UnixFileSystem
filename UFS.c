@@ -7,16 +7,16 @@
 #define PATH_SIZE 4096
 
 // Quelques fonctions qui pourraient vous être utiles
-int NumberofDirEntry(int Size) {
-  return Size/sizeof(DirEntry);
+inline int NumberofDirEntry(int Size) {
+  return Size / sizeof(DirEntry);
 }
 
-int min(int a, int b) {
-  return a<b ? a : b;
+inline int min(int a, int b) {
+  return (a < b) ? a : b;
 }
 
-int max(int a, int b) {
-  return a>b ? a : b;
+inline int max(int a, int b) {
+  return (a > b) ? a : b;
 }
 
 /* Cette fonction va extraire le repertoire d'une chemin d'acces complet, et le copier
