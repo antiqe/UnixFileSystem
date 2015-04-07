@@ -269,7 +269,6 @@ static int AddINodeToINode(const char* filename, const iNodeEntry *pSrcInode, iN
   strcpy(pDirEntry[nDir].Filename, filename);
   if (WriteBlock(pDstInode->Block[0], dataBlock) == -1)
     return -1;
-  pDstInode->iNodeStat.st_nlink++;
   pDstInode->iNodeStat.st_size += sizeof(DirEntry);
   return WriteINodeToDisk(pDstInode);
 }
@@ -518,7 +517,7 @@ int bd_mkdir(const char *pDirName) {
   }
 
   pChildInode->iNodeStat.st_mode |= G_IFDIR | G_IRWXU | G_IRWXG;
-  pChildInode->iNodeStat.st_nlink = 1;
+  pChildInode->iNodeStat.st_nlink = 2;
   pChildInode->iNodeStat.st_size = 2 * sizeof(DirEntry);
   pChildInode->iNodeStat.st_blocks = 1;
   pChildInode->Block[0] = idBlocDir;
@@ -527,6 +526,8 @@ int bd_mkdir(const char *pDirName) {
     ReleaseBlockFromDisk(idBlocDir);
     return -1;
   }
+
+  pDirInode->iNodeStat.st_nlink++;
 
   if (AddINodeToINode(dirName, pChildInode, pDirInode) == -1) {
     ReleaseINodeFromDisk(pChildInode->iNodeStat.st_ino);
@@ -665,8 +666,10 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
     return -1;
 
   if (pInodeSrc->iNodeStat.st_mode & G_IFDIR) {
-    pInodeParentSrc->iNodeStat.st_nlink--;
-    pInodeParentDest->iNodeStat.st_nlink++;
+    if (strcmp(directorySrc, directoryDest) != 0) {
+      pInodeParentSrc->iNodeStat.st_nlink--;
+      pInodeParentDest->iNodeStat.st_nlink++;
+    }
     char dataBlock[BLOCK_SIZE];
     if (ReadBlock(pInodeSrc->Block[0], dataBlock) == -1)
       return -1;
@@ -679,8 +682,9 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
   if (RemoveINodeFromINode(filenameSrc, pInodeSrc, pInodeParentSrc) == -1)
     return -1;
 
-  if (strcmp(directorySrc, directoryDest) == 0)
+  if (strcmp(directorySrc, directoryDest) == 0) {
     pInodeParentDest = pInodeParentSrc;
+  }
 
   if (AddINodeToINode(filenameDest, pInodeSrc, pInodeParentDest) == -1)
     return  -1;
