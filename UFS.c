@@ -420,20 +420,20 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
     return -3;
   }
 
-  if (offset >= DISKSIZE) {
-    printf("Taille trop grande (offset=%d) pour le fichier %s!\n", DISKSIZE, pFilename);
+  const size_t maxFileSize = N_BLOCK_PER_INODE * BLOCK_SIZE;
+  if (offset >= maxFileSize) {
+    printf("Taille trop grande (offset=%ld) pour le fichier %s!\n", maxFileSize, pFilename);
     return -4;
   }
-
-  if ((numbytes + offset) > DISKSIZE) {
+  if ((numbytes + offset) > maxFileSize) {
     printf("Le fichier %s deviendra trop gros!\n", pFilename);
   }
 
   const size_t firstBlock = offset / BLOCK_SIZE;
   const size_t offsetFirstBlock = offset % BLOCK_SIZE;
-  const size_t sizeToWrite = min(numbytes, DISKSIZE - offset);
+  const size_t sizeToWrite = min(numbytes, maxFileSize - offset);
   const size_t lastBlock = (sizeToWrite + offset) / BLOCK_SIZE;
-  const size_t offsetLastBlock = (sizeToWrite + offset) % BLOCK_SIZE;  
+  const size_t offsetLastBlock = (sizeToWrite + offset) % BLOCK_SIZE;
   
   size_t length[N_BLOCK_PER_INODE] = {[0 ... N_BLOCK_PER_INODE - 1] = BLOCK_SIZE};
   length[lastBlock] = offsetLastBlock;
