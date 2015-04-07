@@ -424,7 +424,8 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   }
 
   const size_t maxFileSize = N_BLOCK_PER_INODE * BLOCK_SIZE;
-  if (offset > maxFileSize) {
+  if (offset >= maxFileSize) {
+    printf("Taille trop grande (offset=%ld) pour le fichier %s!\n", maxFileSize, pFilename);
     return -4;
   }
 
