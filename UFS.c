@@ -391,7 +391,7 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   readOffset[firstBlock] = offsetFirstBlock;
 
   size_t i, writeOffset = 0;
-  for (i = firstBlock; i < lastBlock; ++i) {
+  for (i = firstBlock; (i <= lastBlock) && (i < N_BLOCK_PER_INODE); ++i) {
     char *dataBlock = alloca(BLOCK_SIZE);
     if (ReadBlock(pInode->Block[i], dataBlock) == -1)
       return -1;
@@ -420,19 +420,18 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
     return -3;
   }
 
-  const size_t maxFileSize = N_BLOCK_PER_INODE * BLOCK_SIZE;
-  if (offset >= maxFileSize) {
-    printf("Taille trop grande (offset=%ld) pour le fichier %s!\n", maxFileSize, pFilename);
+  if (offset >= DISKSIZE) {
+    printf("Taille trop grande (offset=%d) pour le fichier %s!\n", DISKSIZE, pFilename);
     return -4;
   }
 
-  if ((numbytes + offset) > maxFileSize) {
+  if ((numbytes + offset) > DISKSIZE) {
     printf("Le fichier %s deviendra trop gros!\n", pFilename);
   }
 
   const size_t firstBlock = offset / BLOCK_SIZE;
   const size_t offsetFirstBlock = offset % BLOCK_SIZE;
-  const size_t sizeToWrite = min(numbytes, maxFileSize - offset);
+  const size_t sizeToWrite = min(numbytes, DISKSIZE - offset);
   const size_t lastBlock = (sizeToWrite + offset) / BLOCK_SIZE;
   const size_t offsetLastBlock = (sizeToWrite + offset) % BLOCK_SIZE;  
   
@@ -444,7 +443,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   writeOffset[firstBlock] = offsetFirstBlock;
 
   size_t i, readOffset = 0;
-  for (i = firstBlock; i < lastBlock; ++i) {
+  for (i = firstBlock; (i <= lastBlock) && (i < N_BLOCK_PER_INODE); ++i) {
     if (i >= pInode->iNodeStat.st_blocks) {
       int block = 0;
       if ((block = GetFreeBlock()) == -1)
