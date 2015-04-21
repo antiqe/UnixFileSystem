@@ -1,6 +1,6 @@
 #File system
 
-##IFT-2001 - Laval University (Québec, CANADA)
+##GLO-2001 - Laval University (Québec, CANADA)
 ###C Project
 
 Credits :
